@@ -8,5 +8,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "*"
+env_logger = "*"
+log = "*"
 byteorder = "*"
 quick-error = "*"

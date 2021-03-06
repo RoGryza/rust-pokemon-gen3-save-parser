@@ -1,6 +1,6 @@
 mod error;
 pub mod section;
-mod sector;
+pub mod sector;
 
 pub use error::{LoadSaveError, LoadSaveResult};
-pub use sector::Sector;
+pub use section::Save;

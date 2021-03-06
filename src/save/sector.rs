@@ -10,7 +10,7 @@ pub const SECTOR_DATA_SIZE: usize = 0xff4;
 
 #[derive(Clone, Copy)]
 pub struct Sector {
-    pub data: [u8; SECTOR_DATA_SIZE],
+    data: [u8; SECTOR_DATA_SIZE],
     pub id: u16,
     checksum: u16,
     pub security: u32,
@@ -77,7 +77,7 @@ impl Sector {
         })
     }
 
-    pub fn validate_checksum(&self, size: usize) -> LoadSaveResult<()> {
+    pub fn validate_data(&self, size: usize) -> LoadSaveResult<&[u8]> {
         let expected_checksum = calculate_checksum(&self.data[..size]);
         if expected_checksum != self.checksum {
             Err(LoadSaveError::CorruptData(format!(
@@ -85,7 +85,7 @@ impl Sector {
                 expected_checksum, self.checksum,
             )))
         } else {
-            Ok(())
+            Ok(&self.data[..size])
         }
     }
 }
