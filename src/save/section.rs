@@ -7,13 +7,14 @@ use quick_error::ResultExt;
 
 use super::sector::SECTOR_DATA_SIZE;
 use super::{LoadSaveError, LoadSaveResult, Sector};
+use crate::encoding::parse_string_lossy;
 
 pub const SAVE_SECTION_SECTORS: u8 = 14;
 const PLAYER_NAME_LENGTH: usize = 7;
 
 #[derive(Debug, Clone)]
 pub struct SaveBlock2 {
-    // u8 playerName[PLAYER_NAME_LENGTH + 1];
+    pub player_name: String,
     pub gender: Gender,
     // u8 specialSaveWarpFlags;
     pub trainer_id: [u8; 4],
@@ -32,9 +33,7 @@ impl SaveBlock2 {
         const SIZE: usize = 0xF24;
         sector.validate_checksum(SIZE)?;
         let mut reader = Cursor::new(&sector.data);
-        reader
-            .seek(SeekFrom::Current((PLAYER_NAME_LENGTH as i64) + 1))
-            .unwrap(); // player name
+        let player_name = read_player_name(&mut reader).context("Failed to read player name")?;
         let gender = Gender::read(&mut reader)?;
         reader.seek(SeekFrom::Current(1)).unwrap(); // specialSaveWarpFlags
         let mut trainer_id = [0u8; 4];
@@ -44,11 +43,18 @@ impl SaveBlock2 {
         let play_time = read_play_time(&mut reader).context("Failed to read play time")?;
 
         Ok(SaveBlock2 {
+            player_name,
             gender,
             trainer_id,
             play_time,
         })
     }
+}
+
+fn read_player_name(reader: &mut Cursor<&[u8; SECTOR_DATA_SIZE]>) -> io::Result<String> {
+    let mut raw_name = [0u8; PLAYER_NAME_LENGTH + 1];
+    reader.read_exact(&mut raw_name)?;
+    Ok(parse_string_lossy(&raw_name))
 }
 
 fn read_play_time(reader: &mut Cursor<&[u8; SECTOR_DATA_SIZE]>) -> io::Result<Duration> {

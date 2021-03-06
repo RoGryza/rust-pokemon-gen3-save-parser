@@ -25,6 +25,7 @@ fn main() -> Result<()> {
                 println!("SaveBlock2 slot {} at sector {}", save_slot, i);
                 match SaveBlock2::from_sector(&sector) {
                     Ok(block) => {
+                        println!("  name:       {}", block.player_name);
                         println!("  gender:     {:?}", block.gender);
                         let trainer_id =
                             ((block.trainer_id[1] as u16) << 8) | (block.trainer_id[0] as u16);
