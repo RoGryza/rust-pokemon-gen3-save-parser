@@ -1,4 +1,5 @@
 mod encoding;
+mod pokedex;
 mod rom;
 mod save;
 
@@ -16,7 +17,7 @@ fn main() -> Result<()> {
     let rom = File::open(ROM_FILE).and_then(Rom::load)?;
 
     for i in 0..5 {
-        let poke = rom.pokemon.get_by_species_id(i).unwrap();
+        let poke = rom.pokemon.get_by_species_id(i.into()).unwrap();
         println!("Pokemon {}: {}", i, poke.name);
     }
     println!();
@@ -53,6 +54,15 @@ fn main() -> Result<()> {
     println!("play_time:  {:02}:{:02}:{:02}", hours, mins, secs);
 
     println!("money:      {}", save.money);
+    println!("{} pokemon in pokedex:", save.pokedex.len());
+    for (national_dex_id, status) in &save.pokedex {
+        let species_id = rom
+            .pokemon
+            .national_dex_to_species_id(*national_dex_id)
+            .unwrap();
+        let poke = rom.pokemon.get_by_species_id(species_id).unwrap();
+        println!("  {}: {:?}", poke.name, status);
+    }
 
     Ok(())
 }

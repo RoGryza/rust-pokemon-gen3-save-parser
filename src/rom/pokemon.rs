@@ -1,6 +1,7 @@
 use std::io::{self, Read, Seek};
 
 use super::read::RomReadExt;
+use crate::pokedex::{NationalDexId, SpeciesId};
 
 const NUM_SPECIES: usize = 1268;
 const POKEMON_NAME_LENGTH: usize = 10;
@@ -27,7 +28,15 @@ impl PokemonTable {
         Ok(PokemonTable { species })
     }
 
-    pub fn get_by_species_id(&self, species_id: u16) -> Option<&Species> {
-        self.species.get(species_id as usize)
+    pub fn get_by_species_id(&self, species_id: SpeciesId) -> Option<&Species> {
+        self.species.get(species_id.0 as usize)
+    }
+
+    pub fn national_dex_to_species_id(&self, national_dex_id: NationalDexId) -> Option<SpeciesId> {
+        Some(SpeciesId(national_dex_id.0))
+    }
+
+    pub fn species_to_natinal_dex_id(&self, species_id: SpeciesId) -> Option<NationalDexId> {
+        Some(NationalDexId(species_id.0))
     }
 }

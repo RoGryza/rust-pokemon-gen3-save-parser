@@ -8,6 +8,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use super::sector::{Sector, SECTOR_DATA_SIZE};
 use super::{LoadSaveError, LoadSaveResult};
 use crate::encoding::parse_string_lossy;
+use crate::pokedex::{Pokedex, PokedexStatus};
 
 pub const SAVE_SECTION_SECTORS: u8 = 14;
 const PLAYER_NAME_LENGTH: usize = 7;
@@ -20,12 +21,6 @@ pub struct Save {
     pub play_time: Duration,
     pub money: u32,
     pub pokedex: Pokedex,
-}
-
-#[derive(Debug, Clone)]
-pub struct Pokedex {
-    pub seen: HashSet<u16>,
-    pub caught: HashSet<u16>,
 }
 
 struct SaveBlock2 {
@@ -148,22 +143,21 @@ impl SaveBlock1 {
         let data = sector.validate_data(SECTOR_DATA_SIZE)?;
         let money = LittleEndian::read_u32(&data[0x0290..]);
 
-        let pokedex = Pokedex {
-            seen: parse_pokedex_flags(&data[0x0310..]),
-            caught: parse_pokedex_flags(&data[0x038D..]),
-        };
+        let mut pokedex = parse_pokedex_flags(&data[0x0310..], PokedexStatus::Seen);
+        pokedex.extend(parse_pokedex_flags(&data[0x038D..], PokedexStatus::Caught));
 
         Ok(SaveBlock1 { money, pokedex })
     }
 }
 
-fn parse_pokedex_flags(flags: &[u8]) -> HashSet<u16> {
-    let mut result = HashSet::new();
+fn parse_pokedex_flags(flags: &[u8], status: PokedexStatus) -> Pokedex {
+    let mut result = Pokedex::new();
     for (i, flag) in flags[..125].iter().enumerate() {
         // No need to get fancy, just iterate over all bits
         for j in 0u16..8 {
             if flag & (1 << (7 - j)) != 0 {
-                result.insert(i as u16 * 8 + j);
+                let id = i as u16 * 8 + j;
+                result.insert(id.into(), status);
             }
         }
     }
