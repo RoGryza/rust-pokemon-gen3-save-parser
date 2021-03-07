@@ -1,7 +1,5 @@
 use std::io::{self, Read, Seek};
 
-use crate::encoding::parse_string_lossy;
-
 use super::read::RomReadExt;
 
 const NUM_SPECIES: usize = 1268;
@@ -22,10 +20,8 @@ impl PokemonTable {
     pub fn load<R: Read + Seek>(mut reader: R) -> io::Result<Self> {
         reader.seek_pointer_at(SPECIES_NAMES_OFFSET)?;
         let mut species = Vec::new();
-        for _ in 0..NUM_SPECIES {
-            let mut raw_name = [0u8; POKEMON_NAME_LENGTH + 1];
-            reader.read_exact(&mut raw_name)?;
-            let name = parse_string_lossy(&raw_name);
+        for name_res in reader.read_string_list(NUM_SPECIES, POKEMON_NAME_LENGTH + 1) {
+            let name = name_res?;
             species.push(Species { name });
         }
         Ok(PokemonTable { species })

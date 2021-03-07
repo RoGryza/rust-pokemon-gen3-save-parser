@@ -4,7 +4,7 @@ mod save;
 
 use std::fs::File;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 
 use rom::Rom;
 use save::Save;
@@ -18,6 +18,18 @@ fn main() -> Result<()> {
     for i in 0..5 {
         let poke = rom.pokemon.get_by_species_id(i).unwrap();
         println!("Pokemon {}: {}", i, poke.name);
+    }
+    println!();
+
+    for i in 0..5 {
+        let mv = rom.moves.get_by_move_id(i).unwrap();
+        println!("Move {}: {}", i, mv.name);
+    }
+    println!();
+
+    for i in 0..5 {
+        let ability = rom.abilities.get_by_ability_id(i).unwrap();
+        println!("Ability {}: {}", i, ability.name);
     }
     println!();
 

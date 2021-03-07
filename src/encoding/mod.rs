@@ -1,4 +1,4 @@
-pub mod charmap;
+mod charmap;
 
 use charmap::{Encoding, CHARMAP};
 
