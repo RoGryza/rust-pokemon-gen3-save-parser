@@ -14,6 +14,8 @@ const ROM_FILE: &str = "rom.bin";
 const SAV_FILE: &str = "box.sav";
 
 fn main() -> Result<()> {
+    env_logger::init();
+
     let rom = File::open(ROM_FILE).and_then(Rom::load)?;
 
     for i in 0..5 {

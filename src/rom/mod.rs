@@ -1,6 +1,7 @@
 mod abilities;
 mod items;
 mod moves;
+mod national_dex;
 mod pokemon;
 mod read;
 

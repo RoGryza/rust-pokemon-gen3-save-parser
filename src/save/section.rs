@@ -155,8 +155,8 @@ fn parse_pokedex_flags(flags: &[u8], status: PokedexStatus) -> Pokedex {
     for (i, flag) in flags[..125].iter().enumerate() {
         // No need to get fancy, just iterate over all bits
         for j in 0u16..8 {
-            if flag & (1 << (7 - j)) != 0 {
-                let id = i as u16 * 8 + j;
+            if flag & (1 << j) != 0 {
+                let id = i as u16 * 8 + j + 1;
                 result.insert(id.into(), status);
             }
         }
