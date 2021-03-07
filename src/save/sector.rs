@@ -8,6 +8,7 @@ use super::{LoadSaveError, LoadSaveResult};
 
 pub const SECTOR_DATA_SIZE: usize = 0xff4;
 
+// TODO do better validation: id range, security, etc
 #[derive(Clone, Copy)]
 pub struct Sector {
     data: [u8; SECTOR_DATA_SIZE],

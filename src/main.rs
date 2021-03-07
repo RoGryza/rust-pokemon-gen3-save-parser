@@ -1,4 +1,5 @@
 mod encoding;
+mod pokedex;
 mod save;
 
 use std::env;
@@ -17,6 +18,7 @@ fn main() -> Result<()> {
     };
 
     let save = Save::read(file)?;
+
     println!("name:       {}", save.player_name);
     println!("gender:     {:?}", save.gender);
     let trainer_id = ((save.trainer_id[1] as u16) << 8) | (save.trainer_id[0] as u16);
@@ -26,6 +28,8 @@ fn main() -> Result<()> {
     let mins = (total_seconds - hours * 60 * 60) / 60;
     let secs = total_seconds - hours * 60 * 60 - mins * 60;
     println!("play_time:  {:02}:{:02}:{:02}", hours, mins, secs);
+
+    println!("money:      {}", save.money);
 
     Ok(())
 }

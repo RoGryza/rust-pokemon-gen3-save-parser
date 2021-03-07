@@ -1,11 +1,11 @@
+use std::collections::HashSet;
 use std::convert::TryFrom;
-use std::io::{self, Cursor, Read, Seek, SeekFrom};
+use std::io::{Read, Seek};
 use std::time::Duration;
 
-use byteorder::{LittleEndian, ReadBytesExt};
-use quick_error::ResultExt;
+use byteorder::{ByteOrder, LittleEndian};
 
-use super::sector::Sector;
+use super::sector::{Sector, SECTOR_DATA_SIZE};
 use super::{LoadSaveError, LoadSaveResult};
 use crate::encoding::parse_string_lossy;
 
@@ -18,14 +18,26 @@ pub struct Save {
     pub gender: Gender,
     pub trainer_id: [u8; 4],
     pub play_time: Duration,
+    pub money: u32,
+    pub pokedex: Pokedex,
+}
+
+#[derive(Debug, Clone)]
+pub struct Pokedex {
+    pub seen: HashSet<u16>,
+    pub caught: HashSet<u16>,
 }
 
 struct SaveBlock2 {
     player_name: String,
     gender: Gender,
-    // u8 specialSaveWarpFlags;
     trainer_id: [u8; 4],
     play_time: Duration,
+}
+
+struct SaveBlock1 {
+    money: u32,
+    pokedex: Pokedex,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -36,7 +48,7 @@ pub enum Gender {
 
 impl Save {
     pub fn read<R: Read + Seek>(mut reader: R) -> LoadSaveResult<Self> {
-        // Prefer using latest save
+        // Check both slots and pick the most recent one
         let sector_results = (
             Sector::read_at(&mut reader, 0),
             Sector::read_at(&mut reader, SAVE_SECTION_SECTORS),
@@ -46,14 +58,8 @@ impl Save {
                 Save::read_slot_with_fallback(reader, 0, s1, s2)
             }
             (Ok(s1), Ok(s2)) => Save::read_slot_with_fallback(reader, 1, s2, s1),
-            (Ok(s1), Err(e)) => {
-                log::warn!("Failed to read save slot 2, falling back to slot 1: {}", e);
-                Save::read_slot(reader, 0, s1)
-            }
-            (Err(e), Ok(s2)) => {
-                log::warn!("Failed to read save slot 1, falling back to slot 2: {}", e);
-                Save::read_slot(reader, 1, s2)
-            }
+            (Ok(s1), Err(_)) => Save::read_slot(reader, 0, s1),
+            (Err(_), Ok(s2)) => Save::read_slot(reader, 1, s2),
             (Err(e), _) => Err(e),
         }
     }
@@ -94,11 +100,16 @@ impl Save {
         assert_eq!(start_sector.id, 0);
         let block2 = SaveBlock2::from_sector(&start_sector)?;
 
+        let sector1 = Sector::read(&mut reader)?;
+        let block1 = SaveBlock1::from_sector(&sector1)?;
+
         Ok(Save {
             player_name: block2.player_name,
             gender: block2.gender,
             trainer_id: block2.trainer_id,
             play_time: block2.play_time,
+            money: block1.money,
+            pokedex: block1.pokedex,
         })
     }
 }
@@ -107,15 +118,21 @@ impl SaveBlock2 {
     pub fn from_sector(sector: &Sector) -> LoadSaveResult<Self> {
         const SIZE: usize = 0xF24;
         let data = sector.validate_data(SIZE)?;
-        let mut reader = Cursor::new(data);
-        let player_name = read_player_name(&mut reader).context("Failed to read player name")?;
-        let gender = Gender::read(&mut reader)?;
-        reader.seek(SeekFrom::Current(1)).unwrap(); // specialSaveWarpFlags
+        let (raw_player_name, data) = data.split_at(PLAYER_NAME_LENGTH + 1);
+        let player_name = parse_string_lossy(raw_player_name);
+        let gender = Gender::try_from(data[0]).map_err(|i| {
+            LoadSaveError::CorruptData(format!("Invalid gender {}, expected 0 or 1", i))
+        })?;
+        let (_, data) = data.split_at(2); // gender and skip specialSaveWarpFlags
         let mut trainer_id = [0u8; 4];
-        reader
-            .read_exact(&mut trainer_id)
-            .context("Failed to read trainer_id")?;
-        let play_time = read_play_time(&mut reader).context("Failed to read play time")?;
+        let (raw_trainer_id, data) = data.split_at(4);
+        trainer_id.copy_from_slice(raw_trainer_id);
+
+        let hours = LittleEndian::read_u16(data) as u64;
+        let minutes = data[2] as u64;
+        let seconds = data[3] as u64;
+        let total_seconds = hours * 60 * 60 + minutes * 60 + seconds;
+        let play_time = Duration::from_secs(total_seconds);
 
         Ok(SaveBlock2 {
             player_name,
@@ -126,27 +143,31 @@ impl SaveBlock2 {
     }
 }
 
-fn read_player_name(reader: &mut Cursor<&[u8]>) -> io::Result<String> {
-    let mut raw_name = [0u8; PLAYER_NAME_LENGTH + 1];
-    reader.read_exact(&mut raw_name)?;
-    Ok(parse_string_lossy(&raw_name))
-}
+impl SaveBlock1 {
+    pub fn from_sector(sector: &Sector) -> LoadSaveResult<Self> {
+        let data = sector.validate_data(SECTOR_DATA_SIZE)?;
+        let money = LittleEndian::read_u32(&data[0x0290..]);
 
-fn read_play_time(reader: &mut Cursor<&[u8]>) -> io::Result<Duration> {
-    let hours = reader.read_u16::<LittleEndian>()? as u64;
-    let minutes = reader.read_u8()? as u64;
-    let seconds = reader.read_u8()? as u64;
-    let total_seconds = hours * 60 * 60 + minutes * 60 + seconds;
-    Ok(Duration::from_secs(total_seconds))
-}
+        let pokedex = Pokedex {
+            seen: parse_pokedex_flags(&data[0x0310..]),
+            caught: parse_pokedex_flags(&data[0x038D..]),
+        };
 
-impl Gender {
-    pub fn read<R: Read>(mut reader: R) -> LoadSaveResult<Self> {
-        let raw = reader.read_u8().context("Failed to read player gender")?;
-        Gender::try_from(raw).map_err(|invalid| {
-            LoadSaveError::CorruptData(format!("Invalid gender: expected 0 or 1, got {}", invalid))
-        })
+        Ok(SaveBlock1 { money, pokedex })
     }
+}
+
+fn parse_pokedex_flags(flags: &[u8]) -> HashSet<u16> {
+    let mut result = HashSet::new();
+    for (i, flag) in flags[..125].iter().enumerate() {
+        // No need to get fancy, just iterate over all bits
+        for j in 0u16..8 {
+            if flag & (1 << (7 - j)) != 0 {
+                result.insert(i as u16 * 8 + j);
+            }
+        }
+    }
+    result
 }
 
 impl TryFrom<u8> for Gender {
