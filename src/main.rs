@@ -33,6 +33,14 @@ fn main() -> Result<()> {
     }
     println!();
 
+    for i in 0..5 {
+        let item = rom.items.get_by_item_id(i).unwrap();
+        println!("Item {}: {}", i, item.name);
+        println!("     id: {}", item.id);
+        println!("  price: {}", item.price);
+    }
+    println!();
+
     let save = Save::read(File::open(SAV_FILE)?)?;
     println!("name:       {}", save.player_name);
     println!("gender:     {:?}", save.gender);
