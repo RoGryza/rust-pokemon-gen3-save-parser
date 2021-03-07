@@ -1,24 +1,27 @@
 mod encoding;
-mod pokedex;
+mod rom;
 mod save;
 
-use std::env;
 use std::fs::File;
 
 use anyhow::{bail, Result};
 
+use rom::Rom;
 use save::Save;
 
+const ROM_FILE: &str = "rom.bin";
+const SAV_FILE: &str = "box.sav";
+
 fn main() -> Result<()> {
-    let mut args = env::args();
-    args.next();
-    let file = match args.next() {
-        Some(filename) => File::open(filename)?,
-        None => bail!("Usage: leprogram <file>"),
-    };
+    let rom = File::open(ROM_FILE).and_then(Rom::load)?;
 
-    let save = Save::read(file)?;
+    for i in 0..5 {
+        let poke = rom.pokemon.get_by_species_id(i).unwrap();
+        println!("Pokemon {}: {}", i, poke.name);
+    }
+    println!();
 
+    let save = Save::read(File::open(SAV_FILE)?)?;
     println!("name:       {}", save.player_name);
     println!("gender:     {:?}", save.gender);
     let trainer_id = ((save.trainer_id[1] as u16) << 8) | (save.trainer_id[0] as u16);
