@@ -1,4 +1,5 @@
 mod error;
+mod pokemon;
 pub mod section;
 pub mod sector;
 

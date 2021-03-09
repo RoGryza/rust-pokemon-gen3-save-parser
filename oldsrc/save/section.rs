@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use byteorder::{ByteOrder, LittleEndian};
 
+use super::pokemon::Pokemon;
 use super::sector::{Sector, SECTOR_DATA_SIZE};
 use super::{LoadSaveError, LoadSaveResult};
 use crate::encoding::parse_string_lossy;
@@ -21,6 +22,7 @@ pub struct Save {
     pub play_time: Duration,
     pub money: u32,
     pub pokedex: Pokedex,
+    pub party: Vec<Pokemon>,
 }
 
 struct SaveBlock2 {
@@ -33,6 +35,7 @@ struct SaveBlock2 {
 struct SaveBlock1 {
     money: u32,
     pokedex: Pokedex,
+    party: Vec<Pokemon>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -83,14 +86,17 @@ impl Save {
         slot: u8,
         fst_sector: Sector,
     ) -> LoadSaveResult<Self> {
+        if fst_sector.id == 0xffff {
+            return Err(LoadSaveError::CorruptData(format!(
+                "Invalid sector ID for save slot: {}",
+                fst_sector.id
+            )));
+        }
         let sector_offset = SAVE_SECTION_SECTORS - fst_sector.id as u8;
         let start_sector = if sector_offset == 0 {
             fst_sector
         } else {
-            Sector::read_at(
-                &mut reader,
-                (slot * SAVE_SECTION_SECTORS + sector_offset) % SAVE_SECTION_SECTORS,
-            )?
+            Sector::read_at(&mut reader, slot * SAVE_SECTION_SECTORS + sector_offset)?
         };
         assert_eq!(start_sector.id, 0);
         let block2 = SaveBlock2::from_sector(&start_sector)?;
@@ -105,6 +111,7 @@ impl Save {
             play_time: block2.play_time,
             money: block1.money,
             pokedex: block1.pokedex,
+            party: block1.party,
         })
     }
 }
@@ -146,7 +153,18 @@ impl SaveBlock1 {
         let mut pokedex = parse_pokedex_flags(&data[0x0310..], PokedexStatus::Seen);
         pokedex.extend(parse_pokedex_flags(&data[0x038D..], PokedexStatus::Caught));
 
-        Ok(SaveBlock1 { money, pokedex })
+        let party_size = data[0x0034] as usize;
+        let mut party = Vec::new();
+        for i in 0..party_size {
+            let offset = 0x0038 + i * Pokemon::SIZE;
+            party.push(Pokemon::from_bytes(&data[offset..offset + Pokemon::SIZE]));
+        }
+
+        Ok(SaveBlock1 {
+            money,
+            pokedex,
+            party,
+        })
     }
 }
 

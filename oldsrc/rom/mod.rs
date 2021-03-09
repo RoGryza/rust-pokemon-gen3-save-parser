@@ -7,8 +7,8 @@ mod read;
 
 use std::io::{self, Read, Seek};
 
-pub use abilities::{Ability, AbilityTable};
-pub use items::{Item, ItemTable};
+pub use abilities::{Ability, AbilityId, AbilityTable};
+pub use items::{Item, ItemId, ItemTable};
 pub use moves::{Move, MoveTable};
 pub use pokemon::{PokemonTable, Species};
 

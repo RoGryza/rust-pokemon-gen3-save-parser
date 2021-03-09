@@ -9,6 +9,9 @@ const NUM_ITEMS: usize = 1268;
 const ITEMS_OFFSET: u64 = 0x01C8;
 const ITEM_NAME_LENGTH: usize = 13;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ItemId(pub u16);
+
 #[derive(Debug, Clone)]
 pub struct ItemTable {
     items: Vec<Item>,
@@ -32,8 +35,8 @@ impl ItemTable {
         Ok(ItemTable { items })
     }
 
-    pub fn get_by_item_id(&self, item_id: u16) -> Option<&Item> {
-        self.items.get(item_id as usize)
+    pub fn get_by_item_id(&self, item_id: ItemId) -> Option<&Item> {
+        self.items.get(item_id.0 as usize)
     }
 }
 
